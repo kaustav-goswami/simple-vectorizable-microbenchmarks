@@ -86,14 +86,30 @@ int main(int argc, char* argv[])
 
     // 1 iteration
 #ifdef GEM5_ANNOTATION
+    // checkpoint
+    m5_exit(0);
     m5_work_begin(0,0);
 #endif
     t_copy = copy(c, a);
+#ifdef GEM5_ANNOTATION
+    m5_work_end(0,0);
+    m5_work_begin(0,0);
+#endif
     t_scale = scale(b, c, scale_factor);
+#ifdef GEM5_ANNOTATION
+    m5_work_end(0,0);
+    m5_work_begin(0,0);
+#endif
     t_add = add(c, a, b);
+#ifdef GEM5_ANNOTATION
+    m5_work_end(0,0);
+    m5_work_begin(0,0);
+#endif
     t_triad = triad(a, b, c, scale_factor);
 #ifdef GEM5_ANNOTATION
     m5_work_end(0,0);
+    // end simulation
+    m5_exit(0);
 #endif
 
     expected_a = 1.0;
