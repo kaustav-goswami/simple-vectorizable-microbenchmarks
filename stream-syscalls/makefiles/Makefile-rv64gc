@@ -1,0 +1,31 @@
+CC ?= riscv64-unknown-linux-gnu-gcc
+CXX ?= riscv64-unknown-linux-gnu-g++
+OUTPUT_PATH ?= .
+OUTPUT_SUFFIX = .rv64gc
+CFLAGS_KERNEL = -O2 -fopenmp
+CXXFLAGS = -O2 -fopenmp
+LDFLAGS = -O2 -fopenmp
+
+# if both m5ops_header_path and m5_build_path are defined, we build the STREAM benchmark with the m5 annotations
+ifneq ($(M5_BUILD_PATH),)
+  CXXFLAGS += -I$(M5OPS_HEADER_PATH)
+  CXXFLAGS += -O -DGEM5_ANNOTATION=1
+  LDFLAGS += -lm5 -L$(M5_BUILD_PATH)/out/
+  TMP_OUTPUT_SUFFIX = $(OUTPUT_SUFFIX)
+  OUTPUT_SUFFIX := $(TMP_OUTPUT_SUFFIX).m5
+endif
+
+all: stream$(OUTPUT_SUFFIX)
+
+stream_kernels$(OUTPUT_SUFFIX).o: stream_kernels.c
+	$(CC) $(CFLAGS_KERNEL) -c stream_kernels.c -o $(OUTPUT_PATH)/stream_kernels$(OUTPUT_SUFFIX).o
+
+stream$(OUTPUT_SUFFIX).o: stream.cpp
+	$(CXX) $(CXXFLAGS) -c stream.cpp -o $(OUTPUT_PATH)/stream$(OUTPUT_SUFFIX).o
+
+stream$(OUTPUT_SUFFIX): stream_kernels$(OUTPUT_SUFFIX).o stream$(OUTPUT_SUFFIX).o
+	$(CXX) stream_kernels$(OUTPUT_SUFFIX).o stream$(OUTPUT_SUFFIX).o -o $(OUTPUT_PATH)/stream$(OUTPUT_SUFFIX) $(LDFLAGS)
+
+clean:
+	rm -f *$(OUTPUT_SUFFIX).o stream$(OUTPUT_SUFFIX)
+

@@ -1,0 +1,6 @@
+[submodule "stream-jemalloc/jemalloc"]
+	path = stream-jemalloc/jemalloc
+	url = https://github.com/jemalloc/jemalloc.git
+[submodule "stream-tcmalloc/tcmalloc"]
+	path = stream-tcmalloc/tcmalloc
+	url = https://github.com/google/tcmalloc.git
