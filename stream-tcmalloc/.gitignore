@@ -1,0 +1,13 @@
+# Build outputs (all architecture variants)
+stream.hw
+stream.hw.sve
+stream.arm
+stream.armsve
+stream.rv64gc
+stream.rvv
+*.hw.m5
+*.hw.sve.m5
+
+# Bazel
+bazel-*
+MODULE.bazel.lock

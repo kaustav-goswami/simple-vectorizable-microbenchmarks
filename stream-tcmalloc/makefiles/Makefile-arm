@@ -1,0 +1,17 @@
+# Cross-compiling TCMalloc for aarch64 is intentionally NOT implemented here.
+#
+# TCMalloc is built via Bazel (see makefiles/Makefile-hw), and unlike
+# jemalloc's autotools build (which cross-compiles with a simple
+# `--host=<triple>` flag), cross-compiling a Bazel build requires defining a
+# full Bazel platform + C/C++ toolchain (execution/target constraints,
+# sysroot, linker flags, etc.) for aarch64-linux-gnu, plus doing the same for
+# every one of TCMalloc's transitive dependencies (Abseil, etc.). That setup
+# is highly site-specific (it depends on your cross sysroot layout) and is
+# out of scope for this repository, so rather than silently producing a
+# broken/incomplete build, this Makefile stops with a clear explanation. See
+# ../README.md ("Cross-compilation") for pointers on how to add it yourself.
+all clean distclean:
+	@echo "makefiles/Makefile-arm: cross-compiling stream-tcmalloc for aarch64 is not supported." >&2
+	@echo "TCMalloc is built via Bazel; see ../README.md (section 'Cross-compilation') for details." >&2
+	@echo "For a NUMA-aware STREAM binary that DOES cross-compile easily, see ../../stream-jemalloc." >&2
+	@exit 1

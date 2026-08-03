@@ -1,0 +1,9 @@
+# See makefiles/Makefile-arm for why cross-compiling TCMalloc is out of
+# scope for this repository (Bazel cross-toolchain/platform definitions are
+# required and are highly site-specific). See ../README.md
+# ("Cross-compilation") for details.
+all clean distclean:
+	@echo "makefiles/Makefile-armsve: cross-compiling stream-tcmalloc for aarch64+SVE is not supported." >&2
+	@echo "TCMalloc is built via Bazel; see ../README.md (section 'Cross-compilation') for details." >&2
+	@echo "For a NUMA-aware STREAM binary that DOES cross-compile easily, see ../../stream-jemalloc." >&2
+	@exit 1

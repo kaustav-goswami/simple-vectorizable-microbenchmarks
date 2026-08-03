@@ -1,0 +1,34 @@
+CC ?= gcc
+CXX ?= g++
+OUTPUT_PATH ?= .
+OUTPUT_SUFFIX = .hw.sve
+
+# See makefiles/Makefile-hw for a full explanation of the TCMalloc/Bazel
+# integration. This variant is meant to be built and run natively on real
+# Armv8.1 SVE hardware, so -march=armv8.1-a+sve is applied to *every*
+# compilation action in the build (including TCMalloc's own sources) via a
+# global --copt, not just to stream_kernels.c.
+# See makefiles/Makefile-hw for why --check_visibility=false is required.
+BAZEL ?= bazel
+BAZEL_BUILD_FLAGS ?= -c opt --check_visibility=false --copt=-march=armv8.1-a+sve
+BAZEL_TARGET := //:stream_tcmalloc
+
+ifneq ($(M5_BUILD_PATH),)
+  BAZEL_BUILD_FLAGS += --define=gem5_annotation=1
+  TMP_OUTPUT_SUFFIX = $(OUTPUT_SUFFIX)
+  OUTPUT_SUFFIX := $(TMP_OUTPUT_SUFFIX).m5
+endif
+
+.PHONY: all clean distclean stream$(OUTPUT_SUFFIX)
+
+all: stream$(OUTPUT_SUFFIX)
+
+stream$(OUTPUT_SUFFIX):
+	CC="$(CC)" CXX="$(CXX)" $(BAZEL) build $(BAZEL_BUILD_FLAGS) $(BAZEL_TARGET)
+	cp -f bazel-bin/stream_tcmalloc $(OUTPUT_PATH)/stream$(OUTPUT_SUFFIX)
+
+clean:
+	rm -f stream$(OUTPUT_SUFFIX)
+
+distclean: clean
+	$(BAZEL) clean --expunge

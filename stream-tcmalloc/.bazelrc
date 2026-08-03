@@ -1,0 +1,11 @@
+# TCMalloc requires C++17 (see tcmalloc/docs/quickstart.md and
+# tcmalloc/.bazelrc); apply it to every C++ compilation action in this
+# workspace, including TCMalloc's own sources pulled in via the tcmalloc
+# submodule.
+build --cxxopt='-std=c++17'
+build --host_cxxopt='-std=c++17'
+
+# Silence warnings coming from external dependencies (mirrors
+# tcmalloc/.bazelrc so TCMalloc's own build output stays readable).
+build --per_file_copt=-external/.*@-w
+build --host_per_file_copt=-external/.*@-w

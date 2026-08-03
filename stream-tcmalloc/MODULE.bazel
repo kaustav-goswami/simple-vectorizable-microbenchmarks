@@ -1,0 +1,22 @@
+# Bazel module for the STREAM + TCMalloc benchmark.
+#
+# TCMalloc's own build system (Bazel with Bzlmod, see ./tcmalloc/MODULE.bazel)
+# is used unmodified to build TCMalloc from the bundled git submodule
+# (./tcmalloc). This file only wires our local stream.cpp/stream_kernels.c
+# cc_binary (see BUILD.bazel) to TCMalloc's NUMA-aware malloc target; it does
+# not patch or reconfigure TCMalloc itself.
+module(
+    name = "stream_tcmalloc",
+    version = "0",
+)
+
+bazel_dep(name = "tcmalloc", version = "0")
+
+# Use the tcmalloc git submodule checked out at ./tcmalloc instead of fetching
+# "tcmalloc" from the Bazel Central Registry (it is not published there -
+# this is how every consumer of TCMalloc's Bazel module is expected to bring
+# it in, see tcmalloc/docs/quickstart.md).
+local_path_override(
+    module_name = "tcmalloc",
+    path = "tcmalloc",
+)

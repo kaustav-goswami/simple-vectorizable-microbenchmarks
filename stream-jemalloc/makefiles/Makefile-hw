@@ -1,0 +1,104 @@
+CC ?= gcc
+CXX ?= g++
+OUTPUT_PATH ?= .
+OUTPUT_SUFFIX = .hw
+CFLAGS_KERNEL = -O2 -fopenmp
+CXXFLAGS = -O2 -fopenmp
+LDFLAGS = -O2 -fopenmp
+
+# --------------------------------------------------------------------------
+# jemalloc (built from the bundled git submodule, ../jemalloc)
+# --------------------------------------------------------------------------
+#
+# jemalloc is built out-of-tree (its source tree is never modified) into a
+# private directory next to this one, and linked *statically* into the
+# stream binary. Because jemalloc's public API is left unprefixed (the
+# default on Linux), the archive's malloc/free/calloc/realloc/posix_memalign
+# and C++ operator new/delete definitions transparently take over as the
+# process-wide allocator for every allocation in this program -- including
+# the ones made internally by std::vector -- with no source changes required
+# anywhere else in stream.cpp.
+#
+# NUMA behavior is *not* implemented by patching jemalloc. Instead we embed
+# jemalloc's own documented tuning knobs (see jemalloc/TUNING.md) as the
+# default `malloc_conf` at configure time via --with-malloc-conf, so a user
+# only has to run the binary and jemalloc auto-detects the rest:
+#
+#   percpu_arena:percpu     Associate each arena with the CPU currently
+#                           running it. Combined with Linux's default
+#                           "local" first-touch NUMA policy, this makes
+#                           jemalloc's own allocations naturally land on
+#                           whichever NUMA node (fast or slow) is local to
+#                           the accessing CPU.
+#   background_thread:true  Let jemalloc's background threads reclaim/
+#                           decay memory instead of doing it synchronously
+#                           on the allocation path.
+#   metadata_thp:auto       Use transparent huge pages for jemalloc's own
+#                           metadata when it is profitable to do so.
+#
+# See ../README.md for the full explanation of how page migration between
+# fast/slow NUMA nodes then happens automatically via the Linux kernel's
+# NUMA balancing / memory tiering, without jemalloc having to implement any
+# of that itself.
+JEMALLOC_SRC_DIR := $(abspath jemalloc)
+JEMALLOC_BUILD_DIR := $(abspath jemalloc-build$(OUTPUT_SUFFIX))
+JEMALLOC_LIB := $(JEMALLOC_BUILD_DIR)/lib/libjemalloc.a
+JEMALLOC_INCLUDE := $(JEMALLOC_BUILD_DIR)/include
+JEMALLOC_MALLOC_CONF ?= percpu_arena:percpu,background_thread:true,metadata_thp:auto
+JEMALLOC_CONFIGURE_FLAGS ?=
+
+CXXFLAGS += -I$(JEMALLOC_INCLUDE)
+# jemalloc needs pthreads; -ldl/-lm are harmless extras kept for portability
+# across libc/toolchain versions that have not folded them into libc.
+JEMALLOC_LDLIBS = -lpthread -ldl -lm
+
+# Native builds default to on, since libnuma-dev is commonly available and
+# this is the variant actually meant to run on real NUMA hardware. Cross
+# builds default this off (see e.g. makefiles/Makefile-arm) since typical
+# cross sysroots do not ship libnuma. Override with WITH_LIBNUMA=1/0.
+WITH_LIBNUMA ?= 1
+ifeq ($(WITH_LIBNUMA),1)
+  CXXFLAGS += -DUSE_LIBNUMA
+  JEMALLOC_LDLIBS += -lnuma
+endif
+
+# if both m5ops_header_path and m5_build_path are defined, we build the STREAM benchmark with the m5 annotations
+ifneq ($(M5_BUILD_PATH),)
+  CXXFLAGS += -I$(M5OPS_HEADER_PATH)
+  CXXFLAGS += -O -DGEM5_ANNOTATION=1
+  LDFLAGS += -lm5 -L$(M5_BUILD_PATH)/out/
+  TMP_OUTPUT_SUFFIX = $(OUTPUT_SUFFIX)
+  OUTPUT_SUFFIX := $(TMP_OUTPUT_SUFFIX).m5
+endif
+
+all: stream$(OUTPUT_SUFFIX)
+
+# Generate ./configure from configure.ac (jemalloc ships without a
+# pre-generated configure script). This only touches the submodule with the
+# standard autotools bootstrap step every jemalloc user has to run; it does
+# not change any jemalloc source or behavior.
+$(JEMALLOC_SRC_DIR)/configure:
+	cd $(JEMALLOC_SRC_DIR) && ./autogen.sh
+
+$(JEMALLOC_LIB): $(JEMALLOC_SRC_DIR)/configure
+	mkdir -p $(JEMALLOC_BUILD_DIR)
+	cd $(JEMALLOC_BUILD_DIR) && $(JEMALLOC_SRC_DIR)/configure \
+		CC="$(CC)" \
+		--with-malloc-conf=$(JEMALLOC_MALLOC_CONF) \
+		$(JEMALLOC_CONFIGURE_FLAGS)
+	$(MAKE) -C $(JEMALLOC_BUILD_DIR) -j$$(nproc) build_lib_static
+
+stream_kernels$(OUTPUT_SUFFIX).o: stream_kernels.c
+	$(CC) $(CFLAGS_KERNEL) -c stream_kernels.c -o $(OUTPUT_PATH)/stream_kernels$(OUTPUT_SUFFIX).o
+
+stream$(OUTPUT_SUFFIX).o: stream.cpp $(JEMALLOC_LIB)
+	$(CXX) $(CXXFLAGS) -c stream.cpp -o $(OUTPUT_PATH)/stream$(OUTPUT_SUFFIX).o
+
+stream$(OUTPUT_SUFFIX): stream_kernels$(OUTPUT_SUFFIX).o stream$(OUTPUT_SUFFIX).o $(JEMALLOC_LIB)
+	$(CXX) stream_kernels$(OUTPUT_SUFFIX).o stream$(OUTPUT_SUFFIX).o $(JEMALLOC_LIB) -o $(OUTPUT_PATH)/stream$(OUTPUT_SUFFIX) $(LDFLAGS) $(JEMALLOC_LDLIBS)
+
+clean:
+	rm -f *$(OUTPUT_SUFFIX).o stream$(OUTPUT_SUFFIX)
+
+distclean: clean
+	rm -rf $(JEMALLOC_BUILD_DIR)

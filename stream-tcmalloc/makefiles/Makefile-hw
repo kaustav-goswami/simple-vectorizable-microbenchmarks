@@ -1,0 +1,58 @@
+CC ?= gcc
+CXX ?= g++
+OUTPUT_PATH ?= .
+OUTPUT_SUFFIX = .hw
+
+# --------------------------------------------------------------------------
+# TCMalloc (built from the bundled git submodule, ../tcmalloc)
+# --------------------------------------------------------------------------
+#
+# Unlike jemalloc, TCMalloc (https://github.com/google/tcmalloc) does not
+# ship an autotools/plain-Makefile build; Bazel is its official build system
+# (see tcmalloc/README.md), and its NUMA-awareness is a *compile-time
+# variant* of the library (tcmalloc/tcmalloc:tcmalloc_numa_aware, built with
+# -DTCMALLOC_INTERNAL_NUMA_AWARE) rather than a runtime flag. Re-implementing
+# that with a hand-written Makefile would mean re-deriving TCMalloc's entire
+# dependency graph (Abseil, protobuf, re2, ...) by hand, so instead this
+# Makefile simply drives Bazel, which is what upstream TCMalloc itself
+# recommends (see ../BUILD.bazel and ../README.md for the full explanation).
+#
+# `bazel build //:stream_tcmalloc` compiles stream.cpp/stream_kernels.c
+# (completely unmodified, no allocator-specific code) and links them against
+# TCMalloc's tcmalloc_numa_aware malloc via Bazel's `malloc` attribute. The
+# resulting binary is then copied out to stream.hw so it behaves exactly
+# like every other variant in this repo: `./stream.hw <array_size>`.
+# --check_visibility=false is required because upstream TCMalloc scopes
+# //tcmalloc:tcmalloc_numa_aware's visibility to its own //tcmalloc/testing
+# package (see ../BUILD.bazel and ../README.md, "Why --check_visibility=
+# false"). It is a Bazel access-control relaxation only; it does not alter
+# TCMalloc's source or behavior in any way.
+BAZEL ?= bazel
+BAZEL_BUILD_FLAGS ?= -c opt --check_visibility=false
+BAZEL_TARGET := //:stream_tcmalloc
+
+# if M5_BUILD_PATH is defined, build with the GEM5_ANNOTATION preprocessor
+# define (stream.cpp then shells out to `m5` around each kernel, exactly as
+# in stream-syscalls; see README.md).
+ifneq ($(M5_BUILD_PATH),)
+  BAZEL_BUILD_FLAGS += --define=gem5_annotation=1
+  TMP_OUTPUT_SUFFIX = $(OUTPUT_SUFFIX)
+  OUTPUT_SUFFIX := $(TMP_OUTPUT_SUFFIX).m5
+endif
+
+.PHONY: all clean distclean stream$(OUTPUT_SUFFIX)
+
+all: stream$(OUTPUT_SUFFIX)
+
+stream$(OUTPUT_SUFFIX):
+	CC="$(CC)" CXX="$(CXX)" $(BAZEL) build $(BAZEL_BUILD_FLAGS) $(BAZEL_TARGET)
+	cp -f bazel-bin/stream_tcmalloc $(OUTPUT_PATH)/stream$(OUTPUT_SUFFIX)
+
+clean:
+	rm -f stream$(OUTPUT_SUFFIX)
+
+# Also throws away Bazel's build/output cache for this workspace (frees
+# significant disk space, but the next build will re-fetch/re-build
+# TCMalloc's dependencies from scratch).
+distclean: clean
+	$(BAZEL) clean --expunge

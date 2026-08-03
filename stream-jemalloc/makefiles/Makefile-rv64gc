@@ -1,0 +1,65 @@
+CC ?= riscv64-unknown-linux-gnu-gcc
+CXX ?= riscv64-unknown-linux-gnu-g++
+OUTPUT_PATH ?= .
+OUTPUT_SUFFIX = .rv64gc
+CFLAGS_KERNEL = -O2 -fopenmp
+CXXFLAGS = -O2 -fopenmp
+LDFLAGS = -O2 -fopenmp
+
+# --------------------------------------------------------------------------
+# jemalloc (built from the bundled git submodule, ../jemalloc)
+# --------------------------------------------------------------------------
+# See makefiles/Makefile-hw for a full explanation of this section.
+JEMALLOC_SRC_DIR := $(abspath jemalloc)
+JEMALLOC_BUILD_DIR := $(abspath jemalloc-build$(OUTPUT_SUFFIX))
+JEMALLOC_LIB := $(JEMALLOC_BUILD_DIR)/lib/libjemalloc.a
+JEMALLOC_INCLUDE := $(JEMALLOC_BUILD_DIR)/include
+JEMALLOC_MALLOC_CONF ?= percpu_arena:percpu,background_thread:true,metadata_thp:auto
+JEMALLOC_HOST ?= riscv64-unknown-linux-gnu
+JEMALLOC_CONFIGURE_FLAGS ?= --host=$(JEMALLOC_HOST)
+
+CXXFLAGS += -I$(JEMALLOC_INCLUDE)
+JEMALLOC_LDLIBS = -lpthread -ldl -lm
+
+WITH_LIBNUMA ?= 0
+ifeq ($(WITH_LIBNUMA),1)
+  CXXFLAGS += -DUSE_LIBNUMA
+  JEMALLOC_LDLIBS += -lnuma
+endif
+
+# if both m5ops_header_path and m5_build_path are defined, we build the STREAM benchmark with the m5 annotations
+ifneq ($(M5_BUILD_PATH),)
+  CXXFLAGS += -I$(M5OPS_HEADER_PATH)
+  CXXFLAGS += -O -DGEM5_ANNOTATION=1
+  LDFLAGS += -lm5 -L$(M5_BUILD_PATH)/out/
+  TMP_OUTPUT_SUFFIX = $(OUTPUT_SUFFIX)
+  OUTPUT_SUFFIX := $(TMP_OUTPUT_SUFFIX).m5
+endif
+
+all: stream$(OUTPUT_SUFFIX)
+
+$(JEMALLOC_SRC_DIR)/configure:
+	cd $(JEMALLOC_SRC_DIR) && ./autogen.sh
+
+$(JEMALLOC_LIB): $(JEMALLOC_SRC_DIR)/configure
+	mkdir -p $(JEMALLOC_BUILD_DIR)
+	cd $(JEMALLOC_BUILD_DIR) && $(JEMALLOC_SRC_DIR)/configure \
+		CC="$(CC)" \
+		--with-malloc-conf=$(JEMALLOC_MALLOC_CONF) \
+		$(JEMALLOC_CONFIGURE_FLAGS)
+	$(MAKE) -C $(JEMALLOC_BUILD_DIR) -j$$(nproc) build_lib_static
+
+stream_kernels$(OUTPUT_SUFFIX).o: stream_kernels.c
+	$(CC) $(CFLAGS_KERNEL) -c stream_kernels.c -o $(OUTPUT_PATH)/stream_kernels$(OUTPUT_SUFFIX).o
+
+stream$(OUTPUT_SUFFIX).o: stream.cpp $(JEMALLOC_LIB)
+	$(CXX) $(CXXFLAGS) -c stream.cpp -o $(OUTPUT_PATH)/stream$(OUTPUT_SUFFIX).o
+
+stream$(OUTPUT_SUFFIX): stream_kernels$(OUTPUT_SUFFIX).o stream$(OUTPUT_SUFFIX).o $(JEMALLOC_LIB)
+	$(CXX) stream_kernels$(OUTPUT_SUFFIX).o stream$(OUTPUT_SUFFIX).o $(JEMALLOC_LIB) -o $(OUTPUT_PATH)/stream$(OUTPUT_SUFFIX) $(LDFLAGS) $(JEMALLOC_LDLIBS)
+
+clean:
+	rm -f *$(OUTPUT_SUFFIX).o stream$(OUTPUT_SUFFIX)
+
+distclean: clean
+	rm -rf $(JEMALLOC_BUILD_DIR)

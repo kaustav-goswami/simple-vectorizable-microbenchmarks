@@ -1,0 +1,45 @@
+# The stream binary itself is completely allocator-agnostic: stream.cpp uses
+# plain std::vector/new allocations, exactly like the plain ../stream variant.
+# NUMA-aware TCMalloc is substituted in as the process-wide allocator purely
+# through Bazel's `malloc` attribute below, which is the officially
+# documented way to swap in a custom allocator for a cc_binary
+# (see tcmalloc/docs/quickstart.md, "Creating Your BUILD File").
+#
+# `tcmalloc_numa_aware` is the TCMalloc build variant compiled with
+# -DTCMALLOC_INTERNAL_NUMA_AWARE (see tcmalloc/tcmalloc/BUILD, target
+# `tcmalloc_numa_aware`), which is what makes TCMalloc probe
+# /sys/devices/system/node/*/cpulist at start-up, automatically discover the
+# NUMA nodes present on the machine, and bind/partition its memory
+# accordingly. See ../README.md for the full explanation.
+#
+# NOTE: upstream TCMalloc scopes `//tcmalloc:tcmalloc_numa_aware`'s
+# visibility to its own `//tcmalloc/testing` package (it is normally only
+# consumed by TCMalloc's own variant test/benchmark harness). Depending on it
+# from here therefore requires building with `--check_visibility=false` (see
+# makefiles/Makefile-hw and README.md, "Why --check_visibility=false"). This
+# is a Bazel-level access-control relaxation only -- it does not change a
+# single line of TCMalloc's source, and TCMalloc itself is used completely
+# unmodified.
+cc_binary(
+    name = "stream_tcmalloc",
+    srcs = [
+        "stream.cpp",
+        "stream_kernels.c",
+    ],
+    copts = [
+        "-O2",
+        "-fopenmp",
+    ] + select({
+        "//:gem5_annotation": ["-DGEM5_ANNOTATION=1"],
+        "//conditions:default": [],
+    }),
+    linkopts = [
+        "-fopenmp",
+    ],
+    malloc = "@tcmalloc//tcmalloc:tcmalloc_numa_aware",
+)
+
+config_setting(
+    name = "gem5_annotation",
+    define_values = {"gem5_annotation": "1"},
+)

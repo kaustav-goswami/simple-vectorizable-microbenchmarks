@@ -1,0 +1,16 @@
+# Build outputs (all architecture variants)
+stream.hw
+stream.hw.sve
+stream.arm
+stream.armsve
+stream.rv64gc
+stream.rvv
+*.o
+*.hw.m5
+*.arm.m5
+*.armsve.m5
+*.rv64gc.m5
+*.rvv.m5
+
+# Out-of-tree jemalloc build directories created by the Makefiles
+jemalloc-build*/
