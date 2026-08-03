@@ -88,29 +88,34 @@ int main(int argc, char* argv[])
     // 1 iteration
 #ifdef GEM5_ANNOTATION
     // checkpoint
-    system("m5 --addr=0xFFFF0000 exit;");
-    system("m5 --addr=0xFFFF0000 workbegin;");
+    system("m5 exit;");
+    system("m5 resetstats;");
+    system("m5 workbegin;");
 #endif
     t_copy = copy(c, a);
 #ifdef GEM5_ANNOTATION
-    system("m5 --addr=0xFFFF0000 workend;");
-    system("m5 --addr=0xFFFF0000 workbegin;");
+    system("m5 workend;");
+    system("m5 dumpresetstats;");
+    system("m5 workbegin;");
 #endif
     t_scale = scale(b, c, scale_factor);
 #ifdef GEM5_ANNOTATION
-    system("m5 --addr=0xFFFF0000 workend;");
-    system("m5 --addr=0xFFFF0000 workbegin;");
+    system("m5 workend;");
+    system("m5 dumpresetstats;");
+    system("m5 workbegin;");
 #endif
     t_add = add(c, a, b);
 #ifdef GEM5_ANNOTATION
-    system("m5 --addr=0xFFFF0000 workend;");
-    system("m5 --addr=0xFFFF0000 workbegin;");
+    system("m5 workend;");
+    system("m5 dumpresetstats;");
+    system("m5 workbegin;");
 #endif
     t_triad = triad(a, b, c, scale_factor);
 #ifdef GEM5_ANNOTATION
-    system("m5 --addr=0xFFFF0000 workend;");
+    system("m5 workend;");
+    system("m5 dumpresetstats;");
     // end simulation
-    system("m5 --addr=0xFFFF0000 exit;");
+    system("m5 exit;");
 #endif
 
     expected_a = 1.0;
