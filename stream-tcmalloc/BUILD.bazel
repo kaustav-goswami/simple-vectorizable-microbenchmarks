@@ -1,3 +1,8 @@
+# Recent Bazel releases removed the native cc_binary rule; it now has to be
+# loaded explicitly from rules_cc (the same way tcmalloc/tcmalloc/BUILD
+# itself does it).
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+
 # The stream binary itself is completely allocator-agnostic: stream.cpp uses
 # plain std::vector/new allocations, exactly like the plain ../stream variant.
 # NUMA-aware TCMalloc is substituted in as the process-wide allocator purely

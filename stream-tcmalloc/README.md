@@ -176,6 +176,16 @@ cache.
   `--cxxopt='-std=c++17'` for every C++ compilation action, matching
   [`tcmalloc/.bazelrc`](tcmalloc/.bazelrc).
 
+Note on Bazel versions: recent Bazel releases (8+) removed the native
+`cc_binary`/`cc_library`/`cc_test` rules; they must now be loaded explicitly
+from the `rules_cc` module. `BUILD.bazel` in this directory already does
+this (`load("@rules_cc//cc:cc_binary.bzl", "cc_binary")`, the same way
+[`tcmalloc/tcmalloc/BUILD`](tcmalloc/tcmalloc/BUILD) itself does it), and
+`MODULE.bazel` declares the corresponding `bazel_dep(name = "rules_cc", ...)`
+needed to make `@rules_cc` visible to our own package. If you see `This rule
+has been removed from Bazel. Please add a load() statement for it.`, your
+checkout is out of date -- pull the latest `BUILD.bazel`/`MODULE.bazel`.
+
 ### Using Native Hardware
 
 ```sh

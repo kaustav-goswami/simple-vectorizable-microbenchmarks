@@ -12,6 +12,14 @@ module(
 
 bazel_dep(name = "tcmalloc", version = "0")
 
+# Needed directly by our own BUILD.bazel: recent Bazel releases removed the
+# native cc_binary rule, so it has to be loaded from rules_cc explicitly (see
+# BUILD.bazel). Bzlmod only exposes @rules_cc to us if we declare it as a
+# direct bazel_dep ourselves -- it is not enough that tcmalloc depends on it
+# transitively. Version pinned to match tcmalloc/MODULE.bazel's own
+# requirement so Bzlmod's version resolution has nothing to reconcile.
+bazel_dep(name = "rules_cc", version = "0.2.9")
+
 # Use the tcmalloc git submodule checked out at ./tcmalloc instead of fetching
 # "tcmalloc" from the Bazel Central Registry (it is not published there -
 # this is how every consumer of TCMalloc's Bazel module is expected to bring
